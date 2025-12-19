@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import jwt from 'jsonwebtoken';
+const jwt = require('jsonwebtoken');
 import User from '../models/User';
 
 export const register = async (req: Request, res: Response) => {
@@ -43,14 +43,20 @@ export const login = async (req: Request, res: Response) => {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
+    const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
+    const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '7d';
+
     const token = jwt.sign(
-      { id: user._id, role: user.role },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+      { 
+        id: user._id.toString(), 
+        role: user.role 
+      },
+      jwtSecret,
+      { expiresIn: jwtExpiresIn }
     );
 
     const userResponse = {
-      _id: user._id,
+      _id: user._id.toString(),
       username: user.username,
       email: user.email,
       firstName: user.firstName,
