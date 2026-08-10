@@ -1,13 +1,13 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
-export interface IStatistik extends Document {
+export interface IStatistics extends Document {
   ip: string;
   tanggal: string;
   hits: number;
   online: number;
 }
 
-const StatistikSchema: Schema = new Schema({
+const StatisticsSchema: Schema = new Schema({
   ip: { type: String, required: true },
   tanggal: { type: String, required: true },
   hits: { type: Number, default: 1 },
@@ -15,9 +15,9 @@ const StatistikSchema: Schema = new Schema({
 });
 
 // Compound index untuk ip dan tanggal
-StatistikSchema.index({ ip: 1, tanggal: 1 }, { unique: true });
+StatisticsSchema.index({ ip: 1, tanggal: 1 }, { unique: true });
 
-export const Statistik = mongoose.model<IStatistik>('Statistik', StatistikSchema);
+export const Statistics = mongoose.model<IStatistics>('Statistics', StatisticsSchema);
 
 // Middleware untuk tracking pengunjung
 export const trackVisitor = async (req: any, res: any, next: any) => {
@@ -27,11 +27,11 @@ export const trackVisitor = async (req: any, res: any, next: any) => {
     const currentTime = Math.floor(Date.now() / 1000);
 
     // Cek apakah IP sudah ada untuk hari ini
-    const existingStat = await Statistik.findOne({ ip, tanggal: today });
+    const existingStat = await Statistics.findOne({ ip, tanggal: today });
 
     if (existingStat) {
       // Update hits dan online time
-      await Statistik.updateOne(
+      await Statistics.updateOne(
         { ip, tanggal: today },
         { 
           $inc: { hits: 1 },
@@ -40,7 +40,7 @@ export const trackVisitor = async (req: any, res: any, next: any) => {
       );
     } else {
       // Buat record baru
-      await Statistik.create({
+      await Statistics.create({
         ip,
         tanggal: today,
         hits: 1,
@@ -61,24 +61,24 @@ export const getStatistics = async () => {
   const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 300;
 
   // Pengunjung hari ini (unique IP)
-  const todayVisitors = await Statistik.countDocuments({ tanggal: today });
+  const todayVisitors = await Statistics.countDocuments({ tanggal: today });
 
   // Total hits hari ini
-  const todayHits = await Statistik.aggregate([
+  const todayHits = await Statistics.aggregate([
     { $match: { tanggal: today } },
     { $group: { _id: null, total: { $sum: '$hits' } } }
   ]);
 
   // Total pengunjung (all time)
-  const totalVisitors = await Statistik.countDocuments();
+  const totalVisitors = await Statistics.countDocuments();
 
   // Total hits (all time)
-  const totalHits = await Statistik.aggregate([
+  const totalHits = await Statistics.aggregate([
     { $group: { _id: null, total: { $sum: '$hits' } } }
   ]);
 
   // Pengunjung online (dalam 5 menit terakhir)
-  const onlineVisitors = await Statistik.countDocuments({ 
+  const onlineVisitors = await Statistics.countDocuments({ 
     online: { $gt: fiveMinutesAgo } 
   });
 

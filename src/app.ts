@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { connectDB } from './config/database';
 import routes from './routes';
+import { trackVisitor } from './middleware/statistics';
 
 dotenv.config();
 
