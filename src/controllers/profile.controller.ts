@@ -8,6 +8,7 @@ export const getProfile = async (req: Request, res: Response) => {
     if (!profile) {
       profile = await Profile.create({
         namaToko: 'Gaafisto',
+        description: '',
         alamatToko: '',
         kotaToko: '',
         provinsiToko: '',
@@ -23,14 +24,15 @@ export const getProfile = async (req: Request, res: Response) => {
 
 export const updateProfile = async (req: Request, res: Response) => {
   try {
-    const { namaToko, alamatToko, kotaToko, provinsiToko, kodePos } = req.body;
+    const { namaToko, description, alamatToko, kotaToko, provinsiToko, kodePos } = req.body;
 
     let profile = await Profile.findOne();
 
     if (!profile) {
-      profile = await Profile.create({ namaToko, alamatToko, kotaToko, provinsiToko, kodePos });
+      profile = await Profile.create({ namaToko, description, alamatToko, kotaToko, provinsiToko, kodePos });
     } else {
       profile.namaToko = namaToko;
+      profile.description = description;
       profile.alamatToko = alamatToko;
       profile.kotaToko = kotaToko;
       profile.provinsiToko = provinsiToko;

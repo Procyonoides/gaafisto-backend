@@ -5,16 +5,18 @@ import {
   getAllOrders,
   getOrderById,
   updateOrderStatus,
-  cancelOrder
+  cancelOrder,
+  getSellerOrders
 } from '../controllers/order.controller';
 import { authenticate } from '../middleware/auth';
-import { isAdmin } from '../middleware/role';
+import { isAdmin, isSeller } from '../middleware/role';
 
 const router = Router();
 
 // User routes
 router.post('/', authenticate, createOrder);
 router.get('/my-orders', authenticate, getUserOrders);
+router.get('/seller-orders', authenticate, isSeller, getSellerOrders);
 router.get('/:id', authenticate, getOrderById);
 router.put('/:id/cancel', authenticate, cancelOrder);
 

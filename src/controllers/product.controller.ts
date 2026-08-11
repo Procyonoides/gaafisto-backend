@@ -50,6 +50,7 @@ export const getProductById = async (req: Request, res: Response) => {
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const { itemId, name, category, brand, stock, price, description } = req.body;
+    const requestUser = (req as any).user;
     
     const existingProduct = await Product.findOne({ itemId });
     if (existingProduct) {
@@ -67,7 +68,8 @@ export const createProduct = async (req: Request, res: Response) => {
       stock,
       price,
       description,
-      averageRating: 0
+      averageRating: 0,
+      seller: requestUser.role === 'seller' ? requestUser.id : undefined
     });
 
     await product.save();
@@ -79,6 +81,18 @@ export const createProduct = async (req: Request, res: Response) => {
 
 export const updateProduct = async (req: Request, res: Response) => {
   try {
+    const requestUser = (req as any).user;
+    const existingProduct = await Product.findById(req.params.id);
+
+    if (!existingProduct) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+
+    const isOwner = existingProduct.seller?.toString() === requestUser.id;
+    if (requestUser.role === 'seller' && !isOwner) {
+      return res.status(403).json({ message: 'You can only edit your own products' });
+    }
+
     const updateData = { ...req.body };
     if (req.file) {
       updateData.cover = req.file.filename;
@@ -90,10 +104,6 @@ export const updateProduct = async (req: Request, res: Response) => {
       { new: true }
     );
 
-    if (!product) {
-      return res.status(404).json({ message: 'Product not found' });
-    }
-
     res.json(product);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
@@ -102,12 +112,19 @@ export const updateProduct = async (req: Request, res: Response) => {
 
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
-    
-    if (!product) {
+    const requestUser = (req as any).user;
+    const existingProduct = await Product.findById(req.params.id);
+
+    if (!existingProduct) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    const isOwner = existingProduct.seller?.toString() === requestUser.id;
+    if (requestUser.role === 'seller' && !isOwner) {
+      return res.status(403).json({ message: 'You can only delete your own products' });
+    }
+
+    await Product.findByIdAndDelete(req.params.id);
     res.json({ message: 'Product deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
@@ -146,6 +163,30 @@ export const rateProduct = async (req: Request, res: Response) => {
     await product.save();
 
     res.json({ message: 'Rating submitted successfully', averageRating });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
+export const getMyProducts = async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    const { page = 1, limit = 10 } = req.query;
+
+    const query = { seller: requestUser.id };
+
+    const total = await Product.countDocuments(query);
+    const products = await Product.find(query)
+      .limit(Number(limit))
+      .skip((Number(page) - 1) * Number(limit))
+      .sort({ createdAt: -1 });
+
+    res.json({
+      products,
+      total,
+      page: Number(page),
+      totalPages: Math.ceil(total / Number(limit))
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }

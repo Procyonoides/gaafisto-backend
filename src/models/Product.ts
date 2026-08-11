@@ -10,6 +10,7 @@ export interface IProduct extends Document {
   price: number;
   description: string;
   averageRating: number;
+  seller?: mongoose.Types.ObjectId;
   createdAt: Date;
 }
 
@@ -23,6 +24,7 @@ const ProductSchema: Schema = new Schema({
   price: { type: Number, required: true },
   description: { type: String, required: true },
   averageRating: { type: Number, default: 0 },
+  seller: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   createdAt: { type: Date, default: Date.now }
 });
 

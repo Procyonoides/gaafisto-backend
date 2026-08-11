@@ -86,3 +86,24 @@ export const getMe = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Server error', error });
   }
 };
+
+export const updateMe = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const { firstName, lastName, email, gender } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { firstName, lastName, email, gender },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+};

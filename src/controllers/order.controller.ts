@@ -100,6 +100,14 @@ export const getOrderById = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
+    const requestUser = (req as any).user;
+    const isOwner = order.user._id.toString() === requestUser.id;
+    const isAdminOrSeller = requestUser.role === 'admin' || requestUser.role === 'seller';
+
+    if (!isOwner && !isAdminOrSeller) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     res.json(order);
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
@@ -156,6 +164,40 @@ export const cancelOrder = async (req: Request, res: Response) => {
     await order.save();
 
     res.json({ message: 'Order cancelled successfully', order });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error });
+  }
+};
+
+export const getSellerOrders = async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+
+    const myProducts = await Product.find({ seller: requestUser.id }).select('_id');
+    const myProductIds = myProducts.map(p => p._id.toString());
+
+    const orders = await Order.find({ 'items.product': { $in: myProductIds } })
+      .populate('user', 'username email')
+      .populate('items.product')
+      .sort({ createdAt: -1 });
+
+    const filteredOrders = orders.map(order => {
+      const myItems = order.items.filter(item =>
+        myProductIds.includes(item.product._id.toString())
+      );
+      const mySubtotal = myItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+      return {
+        _id: order._id,
+        user: order.user,
+        status: order.status,
+        createdAt: order.createdAt,
+        items: myItems,
+        mySubtotal
+      };
+    });
+
+    res.json({ orders: filteredOrders, total: filteredOrders.length });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }

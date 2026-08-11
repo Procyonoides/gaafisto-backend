@@ -1,5 +1,6 @@
 import Rating from '../models/Rating';
 import Product from '../models/Product';
+import Order from '../models/Order';
 
 interface ItemRating {
   [itemId: string]: number;
@@ -117,6 +118,51 @@ export class RecommendationService {
   }
 
   /**
+   * Fallback: rekomendasi berdasarkan kategori dari histori pembelian
+   * (dipakai kalau user belum pernah kasih rating sama sekali)
+   */
+  private async getRecommendationsFromPurchaseHistory(
+    userId: string,
+    limit: number
+  ): Promise<any[]> {
+    const userOrders = await Order.find({ user: userId }).populate('items.product');
+
+    if (userOrders.length === 0) {
+      return [];
+    }
+
+    const purchasedProductIds = new Set<string>();
+    const categoryCount: { [category: string]: number } = {};
+
+    userOrders.forEach(order => {
+      order.items.forEach((item: any) => {
+        if (item.product) {
+          purchasedProductIds.add(item.product._id.toString());
+          const category = item.product.category;
+          categoryCount[category] = (categoryCount[category] || 0) + 1;
+        }
+      });
+    });
+
+    const favoriteCategories = Object.entries(categoryCount)
+      .sort(([, a], [, b]) => b - a)
+      .map(([category]) => category);
+
+    if (favoriteCategories.length === 0) {
+      return [];
+    }
+
+    const recommendations = await Product.find({
+      category: { $in: favoriteCategories },
+      _id: { $nin: Array.from(purchasedProductIds) }
+    })
+      .sort({ averageRating: -1 })
+      .limit(limit);
+
+    return recommendations;
+  }
+
+  /**
    * Mendapatkan rekomendasi produk untuk user
    */
   public async getRecommendationsForUser(
@@ -128,7 +174,14 @@ export class RecommendationService {
       const userRatings = await Rating.find({ user: userId });
       
       if (userRatings.length === 0) {
-        // Jika user belum pernah rating, return produk dengan rating tertinggi
+        // Belum pernah rating -> coba fallback dari histori pembelian
+        const purchaseBasedRecs = await this.getRecommendationsFromPurchaseHistory(userId, limit);
+        
+        if (purchaseBasedRecs.length > 0) {
+          return purchaseBasedRecs;
+        }
+
+        // Belum pernah beli sama sekali -> fallback terakhir, produk rating tertinggi
         return await Product.find()
           .sort({ averageRating: -1 })
           .limit(limit);
@@ -205,7 +258,30 @@ export class RecommendationService {
       const similarities = await this.calculateItemSimilarities();
       const productSimilarities = similarities[productId];
 
-      if (!productSimilarities) {
+      // Nggak ada data similarity (produk baru, belum pernah di-rating)
+      // -> fallback ke produk kategori & brand yang sama
+      const hasSimilarityData = productSimilarities && 
+        Object.values(productSimilarities).some(score => score > 0);
+
+      if (!hasSimilarityData) {
+        const currentProduct = await Product.findById(productId);
+        
+        if (currentProduct) {
+          const categoryMatches = await Product.find({
+            _id: { $ne: productId },
+            $or: [
+              { category: currentProduct.category },
+              { brand: currentProduct.brand }
+            ]
+          })
+            .sort({ averageRating: -1 })
+            .limit(limit);
+
+          if (categoryMatches.length > 0) {
+            return categoryMatches;
+          }
+        }
+
         return await Product.find({ _id: { $ne: productId } })
           .sort({ averageRating: -1 })
           .limit(limit);
