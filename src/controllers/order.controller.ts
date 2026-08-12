@@ -118,14 +118,28 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
   try {
     const { status } = req.body;
     
+    const existingOrder = await Order.findById(req.params.id);
+    if (!existingOrder) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    const wasCompleted = existingOrder.status === 'completed';
+    const isNowCompleted = status === 'completed';
+
     const order = await Order.findByIdAndUpdate(
       req.params.id,
       { status },
       { new: true }
     );
 
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+    // Tambah 'sold' cuma sekali, pas status BERUBAH jadi completed
+    // (bukan setiap kali endpoint ini dipanggil)
+    if (!wasCompleted && isNowCompleted) {
+      for (const item of existingOrder.items) {
+        await Product.findByIdAndUpdate(item.product, {
+          $inc: { sold: item.quantity }
+        });
+      }
     }
 
     res.json(order);

@@ -49,7 +49,7 @@ export const getProductById = async (req: Request, res: Response) => {
 
 export const createProduct = async (req: Request, res: Response) => {
   try {
-    const { itemId, name, category, brand, stock, price, description } = req.body;
+    const { itemId, name, category, brand, stock, price, description, discountPercent } = req.body;
     const requestUser = (req as any).user;
     
     const existingProduct = await Product.findOne({ itemId });
@@ -69,7 +69,8 @@ export const createProduct = async (req: Request, res: Response) => {
       price,
       description,
       averageRating: 0,
-      seller: requestUser.role === 'seller' ? requestUser.id : undefined
+      seller: requestUser.role === 'seller' ? requestUser.id : undefined,
+      discountPercent: discountPercent || 0
     });
 
     await product.save();
